@@ -28,7 +28,7 @@ namespace Automat1D
         SolidBrush brush, brushEmpty;
         int[] countTypes;
         Cell[] neighbors;
-        bool[,] energyBorder;
+        int[,] energyBorder;
         public Neighborhood neighborhood { get; set; }
         public bool periodic { get; set; }
         System.Timers.Timer myTimer;
@@ -67,7 +67,7 @@ namespace Automat1D
             neighbors = new Cell[iterations * size];
             countTypes = new int[iterations * size];
             radiusArr = new bool[iterations, size];
-            energyBorder = new bool[iterations, size];
+            energyBorder = new int[iterations, size];
             for (int i = 0; i < iterations; ++i)
             {
                 for (int j = 0; j < size; ++j)
@@ -75,7 +75,7 @@ namespace Automat1D
                     grid[i, j] = new Cell(j, i);
                     arr[i, j] = new Cell(j, i);
                     radiusArr[i, j] = new bool();
-                    energyBorder[i, j] = new bool();
+                    energyBorder[i, j] = new int();
                 }
             }
             cellsInRow = size;
@@ -795,7 +795,12 @@ namespace Automat1D
             {
                 for (int j = 0; j < cellsInRow; ++j)
                 {
-                    if (energyBorder[i, j]) FillCell(grid[i, j], Color.YellowGreen);
+                    if (energyBorder[i, j]>0)
+                    {
+                        FillCell(grid[i, j], Color.FromArgb(energyBorder[i,j]+100));
+                        
+                    }
+                        
                     else FillCell(grid[i, j], Color.Blue);
                 }
             }
@@ -813,7 +818,7 @@ namespace Automat1D
                     for (int j = 0; j < cellsInRow; ++j)
                     {
                         grid[i, j].randHit = false;
-                        energyBorder[i, j] = false;
+                        energyBorder[i, j] = 0;
                     }
                 }
 
@@ -846,7 +851,7 @@ namespace Automat1D
                                     if (neighbors[neighbor].color != grid[iterY, iterX].color) EnergyBase++;
                                 }
 
-                                if(EnergyBase>0) energyBorder[iterY, iterX] = true;
+                                if(EnergyBase>0) energyBorder[iterY, iterX] = EnergyBase;
 
                                 int randNeighbor = rand.Next(countNeighbors);
 
