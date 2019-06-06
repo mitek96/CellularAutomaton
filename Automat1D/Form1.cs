@@ -23,7 +23,7 @@ namespace Automat1D
         {
             InitializeComponent();
             EnableDoubleBuffering();
-            automaton = new Automaton(panel1, myTimer, label4);
+            automaton = new Automaton(panel1, myTimer, label4, label17);
             myTimer.Elapsed += new ElapsedEventHandler(myEvent);
             myTimer.Interval = 100;
             InitializeComboBox();
@@ -193,6 +193,16 @@ namespace Automat1D
         private void button8_Click(object sender, EventArgs e)
         {
             automaton.drawEnergyBorder();
+        }
+
+        private void button9_Click(object sender, EventArgs e)
+        {
+            automaton.DRX((int)numericUpDown10.Value, (double)numericUpDown11.Value, (double)numericUpDown12.Value);
+        }
+
+        private void button10_Click(object sender, EventArgs e)
+        {
+            automaton.drawDissMap();
         }
     }
 }

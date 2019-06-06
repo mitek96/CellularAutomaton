@@ -21,6 +21,10 @@ namespace Automat1D
         public bool set;
         public int Energy;
         public bool randHit;
+        public double density;
+        public bool rx;
+        public bool onBorder;
+        public int stepWhenRx;
 
         public Cell(Color state, Point coord)
         {
@@ -36,6 +40,11 @@ namespace Automat1D
             Coord = new Point();
             Coord.X = x;
             Coord.Y = y;
+            rx = false;
+            density = 0;
+            Energy = 0;
+            stepWhenRx = 0;
+            onBorder = false;
         }
     }
 }

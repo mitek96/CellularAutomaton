@@ -30,7 +30,8 @@
         PentRand,
         HexLeft,
         HexRight,
-        HexRand
+        HexRand,
+        Unset
     }
 
 }

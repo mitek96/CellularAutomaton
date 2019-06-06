@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,7 +12,7 @@ namespace Automat1D
 {
     class Automaton
     {
-
+        bool []colorState;
         public Cell[,] grid;
         Cell[,] arr;
         float offset;
@@ -34,13 +35,152 @@ namespace Automat1D
         System.Timers.Timer myTimer;
         bool full;
         Label timerLabel;
+        Label timerDRX;
         public float radius { get; set; }
         bool[,] radiusArr;
         public int numberOfCellsToRand { get; set; }
+        double time;
+        //double dt;
+        //double percent;
+        const double A = 86710969050178.5f;
+        const double B = 9.41268203527779f;
+        const double AdivB = A / B;
+        int maxEnergy;
+        int pastSteps;
+        double roP = 0;
+
+        public void DRX(int steps, double dt, double percentX)
+        {
+            double ro = 0;
+            double dro = 0;
+            double initialPackage = 0;
+            double sizeCoef = iterations * cellsInRow;
+            int nNeighbours = 0;
+            int randX, randY;
+            double randPackageX;
+            double criticalRo = 0;
 
 
+            for (int i = 0; i < steps; ++i)
+            {
+                ro = AdivB + ((1 - AdivB) * Math.Exp(-B * time));
+                criticalRo = ro / sizeCoef;
+                dro = ro - roP; //pula
+                initialPackage = (dro / sizeCoef) * percentX;
 
-        public Automaton(DoubleBufferedPanel panel, System.Timers.Timer timer, Label timerLabel)
+                using (StreamWriter w = File.AppendText("result.txt"))
+                {
+                    w.WriteLine(time.ToString() + ";" + ro.ToString());
+                }
+
+                for (int sY = 0; sY < iterations; ++sY)
+                {
+                    for (int sX = 0; sX < cellsInRow; ++sX)
+                    {
+                        grid[sY, sX].density += initialPackage;
+                        dro -= initialPackage;
+
+                        nNeighbours = ChooseNeighbor_VonNeumann(grid[sY, sX], BoundaryCondition.periodic);
+
+                        for (int neighbor = 0; neighbor < nNeighbours; ++neighbor)
+                        {
+                            if (neighbors[neighbor].color != grid[sY, sX].color)
+                            {
+                                grid[sY, sX].onBorder = true;
+                                break;
+                            }
+                            else grid[sY, sX].onBorder = false;
+                        }
+
+
+                    }
+                }
+
+                while (dro > 0)
+                {
+                    randX = rand.Next(cellsInRow);
+                    randY = rand.Next(iterations);
+                    randPackageX = rand.NextDouble() * dro;
+
+                    if (grid[randY, randX].onBorder)
+                    {
+                        if (rand.NextDouble() >= 0.2)
+                        {
+                            grid[randY, randX].density += randPackageX;
+                            dro -= randPackageX;
+                        }
+                    }
+                    else
+                    {
+                        if (rand.NextDouble() < 0.2)
+                        {
+                            grid[randY, randX].density += randPackageX;
+                            dro -= randPackageX;
+                        }
+                    }
+                }
+
+                for (int sY = 0; sY < iterations; ++sY)
+                {
+                    for (int sX = 0; sX < cellsInRow; ++sX)
+                    {
+                        if (grid[sY, sX].onBorder)
+                        {
+                            if (grid[sY, sX].density > criticalRo && grid[sY, sX].rx==false)
+                            {
+                                Color rxColor = Color.FromArgb(rand.Next(0, 256), 0, 0);
+                                FillCell(grid[sY, sX], rxColor);
+                                grid[sY, sX].density = 0;
+                                grid[sY, sX].rx = true;
+                                grid[sY, sX].stepWhenRx = pastSteps;
+                                grid[sY, sX].color = rxColor;
+                            }
+                        }
+                    }
+                }
+
+                bool isRxStep = false;
+                double localDensityMax = 0;
+                Color localRxColor = Color.Black;
+
+                for (int sY = 0; sY < iterations; ++sY)
+                {
+                    for (int sX = 0; sX < cellsInRow; ++sX)
+                    {
+                        nNeighbours = ChooseNeighbor_VonNeumann(grid[sY, sX], BoundaryCondition.periodic);
+
+                        for (int neighbor = 0; neighbor < nNeighbours; ++neighbor)
+                        {
+                            if (neighbors[neighbor].rx && neighbors[neighbor].stepWhenRx == pastSteps - 1)
+                            {
+                                isRxStep = true;
+                                localRxColor = neighbors[neighbor].color;
+                            }
+                            if (neighbors[neighbor].density > localDensityMax) localDensityMax = neighbors[neighbor].density;
+
+                        }
+                        if (isRxStep && localDensityMax < grid[sY, sX].density)
+                        {
+                            FillCell(grid[sY, sX], localRxColor);
+                            grid[sY, sX].density = 0;
+                            grid[sY, sX].rx = true;
+                            grid[sY, sX].stepWhenRx = pastSteps;
+                            grid[sY, sX].color = localRxColor;
+                        }
+                        isRxStep = false;
+                        localDensityMax = 0;
+                    }
+                }
+                pastSteps++;
+                time += dt;
+                roP = ro;
+            }
+            timerDRX.Text = time.ToString();
+            panel.Invalidate();
+        }
+
+
+        public Automaton(DoubleBufferedPanel panel, System.Timers.Timer timer, Label timerLabel, Label timerDRX)
         {
             buffer = new Bitmap(panel.Width, panel.Height);
             this.panel = panel;
@@ -53,6 +193,12 @@ namespace Automat1D
             rand = new Random();
             myTimer = timer;
             this.timerLabel = timerLabel;
+            this.timerDRX = timerDRX;
+            time = 0;
+            this.timerDRX.Text = time.ToString();
+            pastSteps = 0;
+            //dt = 0.01f;
+            //percent = 0.2f;
         }
 
         private void Panel_Paint(object sender, PaintEventArgs e)
@@ -68,6 +214,7 @@ namespace Automat1D
             countTypes = new int[iterations * size];
             radiusArr = new bool[iterations, size];
             energyBorder = new int[iterations, size];
+            colorState = new bool[256];
             for (int i = 0; i < iterations; ++i)
             {
                 for (int j = 0; j < size; ++j)
@@ -80,6 +227,17 @@ namespace Automat1D
             }
             cellsInRow = size;
             this.iterations = iterations;
+
+            if (File.Exists("result.txt"))
+            {
+                // If file found, delete it    
+                File.Delete("result.txt");
+                Console.WriteLine("File deleted.");
+            }
+
+            time = 0;
+            pastSteps = 0;
+            roP = 0;
         }
 
         public void SetUniformly(int uniX, int uniY)
@@ -767,7 +925,7 @@ namespace Automat1D
             int r = 1;
             cell.Weight.X = (cell.Coord.X * (int)cellSize) + (int)offset + 1 + cell.Weight.X;
             cell.Weight.Y = (cell.Coord.Y * (int)cellSize) + 1 + cell.Weight.Y;
-            g.DrawEllipse(Pens.Green, cell.Weight.X - r, cell.Weight.Y - r, r + r, r + r);
+            //g.DrawEllipse(Pens.Green, cell.Weight.X - r, cell.Weight.Y - r, r + r, r + r);
         }
 
         public void RandWeights()
@@ -791,16 +949,38 @@ namespace Automat1D
 
         public void drawEnergyBorder()
         {
+
             for (int i = 0; i < iterations; ++i)
             {
                 for (int j = 0; j < cellsInRow; ++j)
                 {
-                    if (energyBorder[i, j]>0)
+                    if (grid[i, j].Energy > 0)
                     {
-                        FillCell(grid[i, j], Color.FromArgb(energyBorder[i,j]+100));
-                        
+                        Color a = Color.FromArgb(255, (int)(255 * ((float)grid[i, j].Energy / maxEnergy)), (int)(255 * (1 - ((float)grid[i, j].Energy / maxEnergy))), 0);
+                        FillCell(grid[i, j], a);
+
                     }
-                        
+
+                    else FillCell(grid[i, j], Color.Blue);
+                }
+            }
+            panel.Invalidate();
+        }
+
+        public void drawDissMap()
+        {
+
+            for (int i = 0; i < iterations; ++i)
+            {
+                for (int j = 0; j < cellsInRow; ++j)
+                {
+                    if (grid[i, j].rx)
+                    {
+                        Color a = Color.FromArgb(255, 0, (int)(255 * ((float)grid[i, j].stepWhenRx / pastSteps)), 0);
+                        FillCell(grid[i, j], a);
+
+                    }
+
                     else FillCell(grid[i, j], Color.Blue);
                 }
             }
@@ -818,7 +998,7 @@ namespace Automat1D
                     for (int j = 0; j < cellsInRow; ++j)
                     {
                         grid[i, j].randHit = false;
-                        energyBorder[i, j] = 0;
+                        grid[i, j].Energy = 0;
                     }
                 }
 
@@ -841,17 +1021,18 @@ namespace Automat1D
 
                             if (grid[iterY, iterX].randHit == false)
                             {
-                                
+
                                 int countNeighbors = AutomatonRules(grid[iterY, iterX]);
+                                maxEnergy = countNeighbors;
                                 int EnergyBase = 0;
                                 int EnergyNew = 0;
-                                
-                                for(int neighbor=0;neighbor<countNeighbors;++neighbor)
+
+                                for (int neighbor = 0; neighbor < countNeighbors; ++neighbor)
                                 {
                                     if (neighbors[neighbor].color != grid[iterY, iterX].color) EnergyBase++;
                                 }
 
-                                if(EnergyBase>0) energyBorder[iterY, iterX] = EnergyBase;
+                                if (EnergyBase > 0) grid[iterY, iterX].Energy = EnergyBase;
 
                                 int randNeighbor = rand.Next(countNeighbors);
 
@@ -864,16 +1045,18 @@ namespace Automat1D
                                 {
                                     grid[iterY, iterX].color = neighbors[randNeighbor].color;
                                     FillCell(grid[iterY, iterX], grid[iterY, iterX].color);
+                                    grid[iterY, iterX].Energy = EnergyNew;
                                 }
-                                    
+
                                 else
                                 {
                                     double probability = Math.Exp(-(EnergyNew - EnergyBase) / kT);
-                                    if(rand.NextDouble() <= probability ? true : false)
+                                    if (rand.NextDouble() <= probability ? true : false)
                                     {
                                         grid[iterY, iterX].color = neighbors[randNeighbor].color;
                                         FillCell(grid[iterY, iterX], grid[iterY, iterX].color);
-                                    }           
+                                        grid[iterY, iterX].Energy = EnergyNew;
+                                    }
                                 }
 
                                 grid[iterY, iterX].randHit = true;
